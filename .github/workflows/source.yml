@@ -1,0 +1,36 @@
+name: Python and model configurations
+on:
+  push:
+    paths: &inputs ['**/*.py', 'configs/gen/*.json', '.github/workflows/source.yml']
+  pull_request:
+    paths: *inputs
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pixal-source-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            **/*.py
+            /configs/gen/*.json
+      - name: Compile sources without importing GPU dependencies
+        run: python3 -m compileall -q .
+      - name: Read generator configurations
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          configs = sorted(Path('configs/gen').glob('*.json'))
+          assert configs, 'No generator configurations found'
+          for config in configs:
+              assert isinstance(json.loads(config.read_text()), dict), config
+          PY
